@@ -13,7 +13,7 @@ try:
 except ImportError:
     pass
 
-SECRET_KEY = os.environ.get('SECRET_KEY')
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-development-fallback-key-9f37c2a1-e8d9')
 
 try:
     from dotenv import load_dotenv

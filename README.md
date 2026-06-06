@@ -2,7 +2,7 @@
 
 Kompleksowa aplikacja webowa typu CRM przeznaczona do automatyzacji, weryfikacji i generowania ofert handlowych w sektorze B2B. System usprawnia komunikację na linii **Handlowiec ↔ CEO ↔ Dział Techniczny**, eliminuje błędy w kalkulacjach finansowych oraz automatyzuje generowanie ujednoliconych dokumentów PDF.
 
-Projekt został zrealizowany w zwinnej metodyce **SCRUM** (Solo Scrum) w okresie od **25 kwietnia 2026 r. do 6 czerwca 2026 r.**
+Projekt został zrealizowany w zwinnej metodyce **SCRUM** (Solo Scrum) w okresie od **25 kwietnia 2026 r. do 19 czerwca 2026 r.**
 
 ---
 
@@ -11,11 +11,12 @@ Projekt został zrealizowany w zwinnej metodyce **SCRUM** (Solo Scrum) w okresie
 System rozwiązuje realny problem biznesowy, jakim jest "ręczne" tworzenie ofert w arkuszach kalkulacyjnych (Excel) oraz brak kontroli nad obiegiem zatwierdzeń dokumentów. 
 
 ### Kluczowe Funkcjonalności:
-*   **Zarządzanie bazą CRM**: Baza firm partnerskich, baza osób kontaktowych (klientów) oraz baza własnych spółek handlowych (wystawców wraz z kontami bankowymi i logotypami).
+*   **Zarządzanie bazą CRM**: Baza firm partnerskich, baza osób kontaktowych (klientów), baza własnych spółek handlowych (wystawców wraz z kontami bankowymi i logotypami) oraz profile handlowców (z zapisem numerów telefonów).
 *   **Kreator Kosztorysów**: Dynamiczne dodawanie pozycji oferty (JS) z automatycznym wyliczaniem kwot Netto, VAT (23%) oraz Brutto przy użyciu sygnałów Django na poziomie bazy danych.
 *   **Zwinny Obieg Dokumentów**: Sztywny podział uprawnień i blokada edycji ofert zatwierdzonych lub oczekujących (ACL).
 *   **Feedback Loop**: Obowiązkowy formularz podania powodu odrzucenia oferty przez CEO wraz z natychmiastowym powiadomieniem dla handlowca.
-*   **Automatyczny Generator PDF**: Tworzenie profesjonalnych ofert w formacie PDF jednym kliknięciem za pomocą silnika `WeasyPrint`.
+*   **Automatyczny Generator PDF**: Tworzenie profesjonalnych ofert w formacie PDF jednym kliknięciem za pomocą silnika `WeasyPrint` z obsługą dynamicznego ładowania logotypu.
+*   **Automatyczna Sekwencyjność**: Chronologiczne i automatyczne nadawanie numerów ofert w formacie `nr/miesiąc/rok` bezpośrednio przy zapisie do bazy.
 
 ---
 
@@ -32,7 +33,7 @@ System rozwiązuje realny problem biznesowy, jakim jest "ręczne" tworzenie ofer
 ## 📊 3. Architektura Systemu i Bazy Danych
 
 ### Diagram Związków Encji (ERD):
-Aplikacja przechowuje dane w pięciu powiązanych ze sobą tabelach. Poniższy schemat przedstawia strukturę relacyjną:
+Aplikacja przechowuje dane w bazie relacyjnej. Poniższy schemat przedstawia strukturę relacji po rozszerzeniu bazy o profile użytkowników:
 
 ```mermaid
 erDiagram
@@ -85,11 +86,25 @@ erDiagram
         decimal price_per_unit "Cena jednostkowa PLN"
         decimal price_in_eur "Cena katalogowa EUR"
     }
+    USER {
+        int id PK
+        string username "Nazwa użytkownika"
+        string first_name "Imię"
+        string last_name "Nazwisko"
+        string email "Email"
+    }
+    USER_PROFILE {
+        int id PK
+        int user_id FK "Użytkownik"
+        string phone "Telefon"
+    }
 
     COMPANY ||--o{ CLIENT : "zatrudnia"
     CLIENT ||--o{ OFFER : "nabywa"
     SELLER ||--o{ OFFER : "wystawia"
     OFFER ||--|{ OFFER_ITEM : "zawiera"
+    USER ||--|| USER_PROFILE : "posiada"
+    USER ||--o{ OFFER : "tworzy"
 ```
 
 ---
@@ -192,6 +207,7 @@ Projekt został w 100% zaimplementowany zgodnie ze standardami inżynierii oprog
 *   **[Log Sprintu 1 (25.04 – 08.05.2026)](file:///Users/jakuba/projekty/offert_system_basic/docs/scrum/02_sprint_1.md)**: Fundamenty CRM, baza danych, planowanie, dane do wykresu Burndown, retrospektywa.
 *   **[Log Sprintu 2 (09.05 – 22.05.2026)](file:///Users/jakuba/projekty/offert_system_basic/docs/scrum/03_sprint_2.md)**: Kreator kosztorysów, formularze i logika kalkulacji finansowych.
 *   **[Log Sprintu 3 (23.05 – 05.06.2026)](file:///Users/jakuba/projekty/offert_system_basic/docs/scrum/04_sprint_3.md)**: Maszyna stanów, generator PDF, szlify UX i naprawa błędów CSS.
+*   **[Log Sprintu 4 (06.06 – 19.06.2026)](file:///Users/jakuba/projekty/offert_system_basic/docs/scrum/05_sprint_4.md)**: Automatyzacja numeracji, profile handlowców, poprawki ładowania logo i stylistyki PDF.
 *   **[Skrypt symulacji Git](file:///Users/jakuba/projekty/offert_system_basic/docs/scrum/git_simulate.sh)**: Skrypt Bash generujący historyczny rejestr 14 commitów odzwierciedlający naszą pracę w tych sprintach.
 
 ---

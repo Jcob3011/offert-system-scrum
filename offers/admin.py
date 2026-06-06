@@ -1,8 +1,10 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
-from .models import Offer, OfferItem, Client, Company, Seller
+from .models import Offer, OfferItem, Client, Company, Seller, UserProfile
 from import_export.admin import ImportExportModelAdmin
+from django.contrib.auth.models import User
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
 # Branding
 admin.site.site_header = "System Ofertowy"
@@ -10,7 +12,6 @@ admin.site.site_title = "Panel Zarządzania"
 admin.site.index_title = "Ofertowanie"
 
 
-# --- Modele ---
 
 @admin.register(Company)
 class CompanyAdmin(admin.ModelAdmin):
@@ -32,7 +33,6 @@ class SellerAdmin(admin.ModelAdmin):
 
 
 
-# --- KONIEC MODELI ---
 
 class OfferItemInline(admin.TabularInline):
     model = OfferItem
@@ -63,14 +63,10 @@ class OfferAdmin(ImportExportModelAdmin):
     list_display_links = ['offer_number']  # Linkujemy tylko numer, żeby nie kliknąć przypadkiem w klienta
     list_filter = ['status', 'created_at', 'client__company']  # Filtr po firmie!
 
-    # ZMIANA: Szukanie "głębokie" (Deep Packet Inspection)
-    # client__last_name -> szukaj w tabeli Client po polu last_name
-    # client__company__name -> szukaj w tabeli Company po polu name
     search_fields = ['offer_number', 'client__last_name', 'client__company__name', 'client__email']
 
     list_per_page = 20
 
-    # --- UI ---
 
     def status_colored(self, obj):
         # Aktualizacja palety kolorów dla nowych statusów
@@ -101,7 +97,6 @@ class OfferAdmin(ImportExportModelAdmin):
 
     pdf_button.short_description = "Pobierz"
 
-    # --- ACL / Readonly ---
 
     def get_readonly_fields(self, request, obj=None):
         # Zablokowane pola systemowe
@@ -117,7 +112,6 @@ class OfferAdmin(ImportExportModelAdmin):
 
         return default_readonly
 
-    # --- ACTIONS (Maszyna Stanów) ---
 
     @admin.action(description='Prześlij do akceptacji ')
     def make_pending(self, request, queryset):
@@ -148,3 +142,18 @@ class OfferAdmin(ImportExportModelAdmin):
             message_bit = f"{rows_updated} ofert"
 
         self.message_user(request, f"Skierowano {message_bit} do konsultacji z Seniorem IT.")
+
+
+class UserProfileInline(admin.StackedInline):
+    model = UserProfile
+    can_delete = False
+    verbose_name_plural = 'Dodatkowe dane (Profil)'
+    fk_name = 'user'
+
+
+class UserAdmin(BaseUserAdmin):
+    inlines = (UserProfileInline,)
+
+
+admin.site.unregister(User)
+admin.site.register(User, UserAdmin)

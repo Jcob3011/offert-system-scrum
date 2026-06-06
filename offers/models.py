@@ -7,8 +7,9 @@ from datetime import timedelta
 from django.contrib.auth.models import User
 from decimal import Decimal
 
-
-# --- NOWE MODELE (CRM) ---
+"""
+Modele odpowiadające za system CRM oraz tworzenie ofert.
+"""
 
 class Company(models.Model):
     name = models.CharField(max_length=200, verbose_name="Nazwa Firmy")
@@ -59,7 +60,6 @@ class Seller(models.Model):
         verbose_name_plural = "Nasze Firmy"
 
 
-# --- ZMODYFIKOWANY MODEL OFERTY ---
 
 class Offer(models.Model):
     class Status(models.TextChoices):
@@ -76,20 +76,19 @@ class Offer(models.Model):
         CASH = 'cash', _('Gotówka')
         CARD = 'card', _('Karta płatnicza')
 
-    # Podstawowe
+    # Powiązania
     seller = models.ForeignKey(Seller, on_delete=models.PROTECT, verbose_name="Wystawca", null=True)
     offer_number = models.CharField(max_length=50, unique=True, verbose_name="Numer oferty")
-    # ZMIANA: Zamiast wpisywać ręcznie, wybieramy z bazy (Foreign Key) (1, 2)
     client = models.ForeignKey(Client, on_delete=models.CASCADE, verbose_name="Klient", null=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT, verbose_name="Status")
     description = RichTextField(null=True, blank=True, help_text="Wstęp/Opis oferty")
+    
     # Finanse
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Suma PLN")
-    # Waluty (7) - Manualne sterowanie na początek
     currency_rate = models.DecimalField(max_digits=6, decimal_places=4, default=1.0000,
                                         verbose_name="Kurs EUR (dla informacji)")
 
-    # Terminy i Płatności (3, 6)
+    # Terminy i Płatności
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     validity_days = models.PositiveIntegerField(default=14, verbose_name="Ważność oferty (dni)")
@@ -97,7 +96,7 @@ class Offer(models.Model):
     payment_method = models.CharField(max_length=20, choices=PaymentMethod.choices, default=PaymentMethod.TRANSFER,
                                       verbose_name="Metoda płatności")
 
-    # Powód odrzucenia (4)
+    # Informacje dodatkowe
     rejection_reason = models.TextField(blank=True, null=True, verbose_name="Powód odrzucenia (CEO)")
 
     external_file = models.FileField(upload_to='offers_archive/', null=True, blank=True, verbose_name="Archiwalny PDF")
@@ -135,8 +134,6 @@ class Offer(models.Model):
         ordering = ['-created_at']
         verbose_name = "Oferta"
         verbose_name_plural = "Baza Ofert"
-
-    #  Funkcja jest gotowa, do konsultacji jak to ma wyglądać w szczegółach oferty dla nas i na generowanym PDF # !WAŻNE
     def get_total_vat(self):
         """Oblicza kwotę samego podatku VAT (23%)"""
         return (self.total_price * Decimal('0.23')).quantize(Decimal('0.01'))
@@ -145,8 +142,70 @@ class Offer(models.Model):
         """Oblicza kwotę Brutto (Netto + VAT)"""
         return (self.total_price * Decimal('1.23')).quantize(Decimal('0.01'))
 
+    def save(self, *args, **kwargs):
+        """Generuje sekwencyjny numer oferty X/MM/YYYY przed pierwszym zapisem."""
+        if not self.offer_number:
+            from django.utils import timezone
+            now = timezone.now()
+            current_month = now.month
+            current_year = now.year
 
-# --- POZYCJE OFERTY (Tu też mała zmiana pod waluty) ---
+            # Liczymy istniejące oferty z tego samego miesiąca i roku
+            count = Offer.objects.filter(
+                created_at__month=current_month,
+                created_at__year=current_year
+            ).count()
+
+            next_number = count + 1
+            while True:
+                candidate = f"{next_number}/{current_month:02d}/{current_year}"
+                if not Offer.objects.filter(offer_number=candidate).exists():
+                    self.offer_number = candidate
+                    break
+                next_number += 1
+
+            if 'update_fields' in kwargs and kwargs['update_fields'] is not None:
+                fields = list(kwargs['update_fields'])
+                if 'offer_number' not in fields:
+                    fields.append('offer_number')
+                kwargs['update_fields'] = fields
+
+        super().save(*args, **kwargs)
+
+    def submit_for_approval(self):
+        """Przesyła ofertę do akceptacji."""
+        if self.status == self.Status.DRAFT:
+            self.status = self.Status.PENDING
+            self.save(update_fields=['status'])
+            return True, f"Oferta {self.offer_number} wysłana do akceptacji."
+        return False, "Tylko szkic można wysłać do akceptacji."
+
+    def approve(self, user):
+        """Zatwierdza ofertę (wymagane uprawnienia superusera)."""
+        if not user.is_superuser:
+            return False, "Brak uprawnień (wymagany CEO)."
+        if self.status == self.Status.PENDING:
+            self.status = self.Status.APPROVED
+            self.save(update_fields=['status'])
+            return True, "Oferta zatwierdzona! Można generować PDF."
+        return False, "Zatwierdzić można tylko oczekującą ofertę."
+
+    def reject(self, reason):
+        """Odrzuca ofertę wraz z podaniem powodu."""
+        if reason:
+            self.status = self.Status.REJECTED
+            self.rejection_reason = reason
+            self.save(update_fields=['status', 'rejection_reason'])
+            return True, f"Oferta odrzucona. Powód: {reason}"
+        return False, "Musisz podać powód odrzucenia!"
+
+    def return_to_draft(self):
+        """Cofa ofertę odrzuconą z powrotem do wersji roboczej."""
+        if self.status == self.Status.REJECTED:
+            self.status = self.Status.DRAFT
+            self.save(update_fields=['status'])
+            return True, "Oferta przywrócona do edycji."
+        return False, "Nie można cofnąć do edycji."
 
 class OfferItem(models.Model):
     offer = models.ForeignKey(Offer, on_delete=models.CASCADE, related_name='items')
@@ -168,9 +227,33 @@ class OfferItem(models.Model):
         return self.description
 
 
-# --- SYGNAŁY BEZ ZMIAN ---
 @receiver(post_save, sender=OfferItem)
 @receiver(post_delete, sender=OfferItem)
 def recalculate_offer_total(sender, instance, **kwargs):
     offer = instance.offer
     offer.update_total()
+
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile', verbose_name="Użytkownik")
+    phone = models.CharField(max_length=20, blank=True, verbose_name="Telefon")
+
+    def __str__(self):
+        return f"Profil: {self.user.username}"
+
+    class Meta:
+        verbose_name = "Profil Użytkownika"
+        verbose_name_plural = "Profile Użytkowników"
+
+
+@receiver(post_save, sender=User)
+def create_user_profile(sender, instance, created, **kwargs):
+    if created:
+        UserProfile.objects.create(user=instance)
+
+
+@receiver(post_save, sender=User)
+def save_user_profile(sender, instance, **kwargs):
+    if not hasattr(instance, 'profile'):
+        UserProfile.objects.create(user=instance)
+    instance.profile.save()

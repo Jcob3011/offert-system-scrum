@@ -8,20 +8,11 @@ IS_PYTHONANYWHERE = 'PYTHONANYWHERE_DOMAIN' in os.environ
 
 try:
     from dotenv import load_dotenv
-
     load_dotenv()
 except ImportError:
     pass
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-development-fallback-key-9f37c2a1-e8d9')
-
-try:
-    from dotenv import load_dotenv
-
-    load_dotenv()  # Szuka pliku .env i ładuje zmienne
-    print("LOG: Załadowano ustawienia z pliku .env (Lokalnie)")
-except ImportError:
-    print("LOG: Brak biblioteki python-dotenv - zakładam, że to Produkcja (PythonAnywhere)")
 
 allowed_hosts_env = os.getenv('ALLOWED_HOSTS', '')
 if allowed_hosts_env:
@@ -106,9 +97,7 @@ WSGI_APPLICATION = 'core.wsgi.application'
 
 DATABASES = {
     'default': {
-        # Zmieniamy silnik na SQLite (baza w pliku)
         'ENGINE': 'django.db.backends.sqlite3',
-        # Wskazujemy, że plik ma leżeć w głównym folderze projektu
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
@@ -153,3 +142,15 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'login'
+
+JAZZMIN_SETTINGS = {
+    "site_title": "Panel Zarządzania",
+    "site_header": "System Ofertowy",
+    "site_brand": "System Ofertowy",
+    "welcome_sign": "Logowanie do panelu administracyjnego",
+    "topmenu_links": [
+        {"name": "Powrót do Strony Głównej", "url": "home", "new_window": False},
+    ],
+    "show_sidebar": True,
+    "navigation_expanded": True,
+}

@@ -112,3 +112,43 @@ Rejestr zawiera historyjki użytkownika (User Stories) zdefiniowane w procesie r
     *   *Given*: Użytkownik przegląda szczegóły oferty.
     *   *When*: Arkusze stylów CSS są ładowane z poprawnych ścieżek statycznych aplikacji.
     *   *Then*: Karta podsumowania poprawnie rozbija sumę na Netto, VAT i Brutto, a badże statusów otrzymują ujednolicone kolory ze stylów CSS.
+
+---
+
+## 📱 4. Epik: Profilowanie, Bezpieczeństwo i Optymalizacja Dokumentów (Sprint 4)
+
+### US12: Automatyczna sekwencyjna numeracja ofert
+*   **Opis**: Jako *Handlowiec*, chcę, aby nowo tworzone oferty automatycznie otrzymywały czytelny i chronologiczny numer sekwencyjny w formacie `(numer oferty/miesiąc/rok)` (np. `1/06/2026`), zamiast długich, skomplikowanych ciągów znaków UUID, co ułatwi ewidencję dokumentów w rozmowach z klientem.
+*   **Priorytet MoSCoW**: MUST HAVE
+*   **Estymacja**: 5 SP
+*   **Kryteria Akceptacji**:
+    *   *Given*: Handlowiec tworzy nową ofertę.
+    *   *When*: Klika "Zapisz".
+    *   *Then*: System oblicza liczbę ofert w bieżącym miesiącu i roku, nadaje kolejną liczbę chronologiczną i zapisuje numer w bazie danych w formacie `X/MM/YYYY`.
+
+### US13: Profilowanie użytkowników (dane kontaktowe Handlowca)
+*   **Opis**: Jako *Handlowiec*, chcę mieć możliwość zdefiniowania swojego imienia, nazwiska oraz numeru telefonu w profilu użytkownika w panelu administracyjnym, aby dane te automatycznie pojawiały się na przygotowywanych przeze mnie ofertach.
+*   **Priorytet MoSCoW**: MUST HAVE
+*   **Estymacja**: 5 SP
+*   **Kryteria Akceptacji**:
+    *   *Given*: Dowolny użytkownik posiada konto w systemie.
+    *   *When*: Administrator wchodzi w edycję użytkownika i uzupełnia nowo dodaną sekcję "Dodatkowe dane (Profil)" o numer telefonu.
+    *   *Then*: Dane profilowe (telefon) są trwale powiązane z użytkownikiem i zapisane w bazie danych w modelu `UserProfile`.
+
+### US14: Integracja danych handlowca z PDF
+*   **Opis**: Jako *Handlowiec*, chcę, aby na wygenerowanym PDF oferty, w sekcji "Ofertę przygotował", pojawiały się moje pełne dane: Imię, Nazwisko, E-mail oraz numer telefonu z profilu, aby klient mógł szybko się ze mną skontaktować.
+*   **Priorytet MoSCoW**: MUST HAVE
+*   **Estymacja**: 2 SP
+*   **Kryteria Akceptacji**:
+    *   *Given*: Oferta ma przypisanego autora (`created_by`), który ma uzupełnione dane profilowe.
+    *   *When*: Zostaje wygenerowany PDF oferty.
+    *   *Then*: Stopka PDF zawiera czytelne dane handlowca, w tym jego imię, nazwisko, adres e-mail oraz numer telefonu (jeśli został podany).
+
+### US15: Weryfikacja i poprawka ładowania logotypu w silniku PDF
+*   **Opis**: Jako *Użytkownik*, chcę, aby logotyp wybranej firmy (wystawcy) zawsze wyświetlał się poprawnie na dokumencie PDF (bez względu na wielkość obrazu czy konfigurację sieciową), a suma brutto kosztorysu była sformatowana czarną czcionką dla zachowania profesjonalnego wyglądu.
+*   **Priorytet MoSCoW**: MUST HAVE
+*   **Estymacja**: 3 SP
+*   **Kryteria Akceptacji**:
+    *   *Given*: Sprzedawca ma wgrane logo (plik graficzny) w formacie JPEG/PNG.
+    *   *When*: Silnik PDF generuje dokument przy wyłączonej obsłudze sieci (`base_url=''`).
+    *   *Then*: System ładuje plik z dysku za pomocą protokołu `file://` z pełną ścieżką systemową, a suma brutto jest wyświetlana czarną czcionką bez zielonego wyróżnika.

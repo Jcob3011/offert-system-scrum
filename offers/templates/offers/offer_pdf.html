@@ -10,8 +10,8 @@
 <table style="width: 100%; border: none; margin-bottom: 30px;">
     <tr>
         <td style="width: 50%; vertical-align: top;">
-            {% if offer.seller.logo %}
-                <img src="{{ offer.seller.logo.url }}" style="max-height: 80px;">
+            {% if logo_url %}
+                <img src="{{ logo_url }}" style="max-height: 80px;">
             {% else %}
                 <h2 style="margin: 0;">{{ offer.seller.name }}</h2>
             {% endif %}
@@ -111,7 +111,7 @@
 <div class="total-section">
     Suma Netto: <span class="total-value">{{ offer.total_price }} PLN</span><br/>
     Podatek VAT (23%): <span class="total-value">{{ offer.get_total_vat }} PLN</span><br/>
-    <strong>Suma Brutto: <span class="total-value" style="color: #198754;">{{ offer.get_total_gross }} PLN</span></strong>
+    <strong>Suma Brutto: <span class="total-value">{{ offer.get_total_gross }} PLN</span></strong>
 </div>
 
 <div class="terms-section">
@@ -142,8 +142,9 @@
         {% if offer.created_by %}
             <h3>{{ offer.created_by.first_name }} {{ offer.created_by.last_name }}</h3>
             <p>Email: {{ offer.created_by.email }}</p>
-        {% else %}
-
+            {% if offer.created_by.profile.phone %}
+                <p>Tel: {{ offer.created_by.profile.phone }}</p>
+            {% endif %}
         {% endif %}
 
         <p><em>Dokument wygenerowany elektronicznie</em></p>

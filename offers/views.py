@@ -11,30 +11,27 @@ from django.template.loader import render_to_string
 from datetime import timedelta
 from django.contrib import messages
 import os
-import sys
+import logging
 
+logger = logging.getLogger(__name__)
 
-# --- WIDOK: KAFELKI (DASHBOARD) ---
 @login_required
 def home(request):
+    """Widok dashboardu (kafelki)."""
     return render(request, 'offers/home.html')
 
-
-# --- WIDOK: LISTA OFERT ---
 @login_required
 def offer_list(request):
+    """Widok listy wszystkich ofert."""
     offers = Offer.objects.all().order_by('-created_at')
     return render(request, 'offers/offer_list.html', {'offers': offers})
 
-
-# --- WIDOK: SZCZEGÓŁY OFERTY ---
 @login_required
 def offer_detail(request, pk):
+    """Widok szczegółów oferty."""
     offer = get_object_or_404(Offer, pk=pk)
     return render(request, 'offers/offer_details.html', {'offer': offer})
 
-
-# --- WIDOK: TWORZENIE NOWEJ OFERTY ---
 @login_required
 def offer_create(request):
     if request.method == 'POST':
@@ -42,14 +39,8 @@ def offer_create(request):
 
         if form.is_valid():
             offer = form.save(commit=False)
-
-            # Generowanie unikalnego numeru
-            timestamp = timezone.now().strftime("%Y%m%d")
-            unique_id = str(uuid.uuid4())[:4].upper()
-            offer.offer_number = f"OF/{timestamp}/{unique_id}"
             offer.created_by = request.user
-
-            offer.save()  # Zapisujemy, żeby mieć ID
+            offer.save()  # Zapisujemy, żeby mieć ID. Numer oferty generuje się automatycznie w save() modelu.
 
             # Podpinamy produkty pod ofertę
             formset = OfferItemFormSet(request.POST, instance=offer)
@@ -57,24 +48,12 @@ def offer_create(request):
             if formset.is_valid():
                 formset.save()
 
-                # Przeliczanie sumy (korzystamy z related_name='items')
-                total = 0
-                for item in offer.items.all():
-                    total += item.total_price
-
-                offer.total_price = total
-                offer.save()
-
                 return redirect('offer_detail', pk=offer.pk)
             else:
-                # BŁĄD W PRODUKTACH
-                print("--- BŁĄD FORMSETU (PRODUKTY) ---")
-                print(formset.errors)
+                logger.error(f"Błąd formsetu produktów: {formset.errors}")
                 offer.delete()  # Usuwamy pustą ofertę
         else:
-            # BŁĄD W NAGŁÓWKU
-            print("--- BŁĄD FORMULARZA GŁÓWNEGO ---")
-            print(form.errors)
+            logger.error(f"Błąd formularza głównego: {form.errors}")
 
     else:
         form = OfferForm()
@@ -107,19 +86,9 @@ def offer_edit(request, pk):
             form.save()
             formset.save()
 
-            # Przeliczamy sumę ponownie
-            total = 0
-            for item in offer.items.all():
-                total += item.total_price
-
-            offer.total_price = total
-            offer.save()
-
             return redirect('offer_detail', pk=offer.pk)
         else:
-            print("--- BŁĄD EDYCJI ---")
-            print("Form errors:", form.errors)
-            print("Formset errors:", formset.errors)
+            logger.error(f"Błąd edycji. Form errors: {form.errors}, Formset errors: {formset.errors}")
 
     else:
         form = OfferForm(instance=offer)
@@ -142,27 +111,17 @@ def offer_pdf(request, pk):
     if not settings.DEBUG:
         # --- PRODUKCJA (PythonAnywhere) ---
         css_path = '/home/jakub3011/offert_system_basic/staticfiles/offers/pdf_style.css'
-
-        # Logo z dysku
-        if offer.seller.logo:
-            logo_url = 'file://' + offer.seller.logo.path
-        else:
-            logo_url = None
-
     else:
         # --- LOKALNIE (Docker) ---
-        # Ścieżka do kodu źródłowego
         css_path = os.path.join(settings.BASE_DIR, 'offers', 'static', 'offers', 'pdf_style.css')
 
-        # Logo
-        logo_url = request.build_absolute_uri(offer.seller.logo.url) if offer.seller.logo else None
+    # Logo z dysku (WeasyPrint wymaga ścieżki lokalnej file://)
+    if offer.seller and offer.seller.logo:
+        logo_url = 'file://' + offer.seller.logo.path
+    else:
+        logo_url = None
 
-    # --- DEBUGOWANIE ---
-    # To zobaczysz w Server Log na PA
-    print(f"--- DEBUG PDF ---", file=sys.stderr)
-    print(f"TRYB: {'PRODUKCJA' if not settings.DEBUG else 'LOKALNY'}", file=sys.stderr)
-    print(f"Używam CSS: {css_path}", file=sys.stderr)
-    print(f"Czy plik istnieje?: {os.path.exists(css_path)}", file=sys.stderr)
+    logger.debug(f"Generowanie PDF: TRYB={'PRODUKCJA' if not settings.DEBUG else 'LOKALNY'}, CSS={css_path}")
 
     # --- RENDEROWANIE ---
     context = {
@@ -179,12 +138,12 @@ def offer_pdf(request, pk):
         try:
             css = CSS(filename=css_path)
             pdf_file = html.write_pdf(stylesheets=[css])
-            print("CSS załadowany poprawnie.", file=sys.stderr)
+            logger.debug("CSS załadowany poprawnie.")
         except Exception as e:
-            print(f"Błąd ładowania CSS: {e}", file=sys.stderr)
+            logger.error(f"Błąd ładowania CSS: {e}")
             pdf_file = html.write_pdf()
     else:
-        print("!!! PLIK CSS NIE ISTNIEJE !!! Generuję bez styli.", file=sys.stderr)
+        logger.warning("Plik CSS nie istnieje. Generowanie PDF bez stylów.")
         pdf_file = html.write_pdf()
 
     response = HttpResponse(pdf_file, content_type='application/pdf')
@@ -192,75 +151,60 @@ def offer_pdf(request, pk):
     return response
 
 
-@login_required
 def offer_reject(request, pk):
+    """Widok do podania powodu odrzucenia oferty."""
     offer = get_object_or_404(Offer, pk=pk)
 
     if request.method == 'POST':
         reason = request.POST.get('rejection_reason')
-        if reason:
-            offer.status = Offer.Status.REJECTED
-            offer.rejection_reason = reason
-            offer.save()
-            messages.warning(request, f"Oferta odrzucona. Powód: {reason}")
-            return redirect('offers:offer_list')
+        success, message = offer.reject(reason)
+        if success:
+            messages.warning(request, message)
+            return redirect('offer_list')
         else:
-            messages.error(request, "Musisz podać powód odrzucenia!")
+            messages.error(request, message)
 
     return render(request, 'offers/offer_reject.html', {'offer': offer})
 
 
 @login_required
 def offer_change_status(request, pk, action):
-    # 1. Pobieramy konkretną ofertę (pakiet)
+    """Zmiana statusu oferty z uwzględnieniem logiki i uprawnień."""
     offer = get_object_or_404(Offer, pk=pk)
-    user = request.user
 
-    # 2. Logika przejść (State Machine)
-
-    # SCENARIUSZ A: Wysłanie do akceptacji (Draft -> Pending)
     if action == 'submit':
-        if offer.status == Offer.Status.DRAFT:
-            offer.status = Offer.Status.PENDING
-            offer.save()
-            messages.success(request, f"Oferta {offer.offer_number} wysłana do akceptacji.")
+        success, message = offer.submit_for_approval()
+        if success:
+            messages.success(request, message)
         else:
-            messages.warning(request, "Tylko szkic można wysłać do akceptacji.")
+            messages.warning(request, message)
 
-    # SCENARIUSZ B: Zatwierdzenie (Pending -> Approved)
     elif action == 'approve':
-        if user.is_superuser:
-            if offer.status == Offer.Status.PENDING:
-                offer.status = Offer.Status.APPROVED
-                offer.save()
-                messages.success(request, "Oferta zatwierdzona! Można generować PDF.")
-            else:
-                messages.warning(request, "Zatwierdzić można tylko oczekującą ofertę.")
+        success, message = offer.approve(request.user)
+        if success:
+            messages.success(request, message)
         else:
-            messages.error(request, "Brak uprawnień (wymagany CEO).")
-
-    # SCENARIUSZ C: Odrzucenie (Pending -> Rejected)
+            if "uprawnień" in message:
+                messages.error(request, message)
+            else:
+                messages.warning(request, message)
 
     elif action == 'reject':
         if request.method == 'POST':
             reason = request.POST.get('rejection_reason')
-            if reason:
-                offer.status = Offer.Status.REJECTED
-                offer.rejection_reason = reason
-                offer.save()
-                messages.warning(request, f"Oferta odrzucona. Powód: {reason}")
+            success, message = offer.reject(reason)
+            if success:
+                messages.warning(request, message)
                 return redirect('offer_list')
             else:
-                messages.error(request, "Musisz podać powód odrzucenia!")
-
+                messages.error(request, message)
         return render(request, 'offers/offer_reject.html', {'offer': offer})
 
-
-    # SCENARIUSZ D: Cofnięcie do Draftu (np. żeby poprawić odrzuconą)
     elif action == 'draft':
-        if offer.status == Offer.Status.REJECTED:
-            offer.status = Offer.Status.DRAFT
-            offer.save()
-            messages.info(request, "Oferta przywrócona do edycji.")
+        success, message = offer.return_to_draft()
+        if success:
+            messages.info(request, message)
+        else:
+            messages.warning(request, message)
 
     return redirect('offer_list')

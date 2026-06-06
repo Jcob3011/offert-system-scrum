@@ -3,11 +3,9 @@ from django.forms import inlineformset_factory
 from .models import Offer, OfferItem
 
 
-# 1. Formularz Główny
 class OfferForm(forms.ModelForm):
     class Meta:
         model = Offer
-        # UWAGA: Tutaj wymieniamy pola, które user ma widzieć i wypełnić.
         fields = [
             'seller',
             'client',
@@ -47,7 +45,6 @@ class OfferForm(forms.ModelForm):
         }
 
 
-# 2. Formularz Pozycji (Payload)
 class OfferItemForm(forms.ModelForm):
     class Meta:
         model = OfferItem
@@ -75,9 +72,8 @@ class OfferItemForm(forms.ModelForm):
         }
 
 
-# 3. FormSet - Fabryka łączenia
 OfferItemFormSet = inlineformset_factory(
     Offer, OfferItem, form=OfferItemForm,
-    extra=1,  # Jeden pusty wiersz na start
-    can_delete=True  # Pozwalamy usuwać wiersze
+    extra=1,
+    can_delete=True
 )

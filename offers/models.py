@@ -139,11 +139,11 @@ class Offer(models.Model):
     #  Funkcja jest gotowa, do konsultacji jak to ma wyglądać w szczegółach oferty dla nas i na generowanym PDF # !WAŻNE
     def get_total_vat(self):
         """Oblicza kwotę samego podatku VAT (23%)"""
-        return self.total_price * Decimal('0.23')
+        return (self.total_price * Decimal('0.23')).quantize(Decimal('0.01'))
 
     def get_total_gross(self):
         """Oblicza kwotę Brutto (Netto + VAT)"""
-        return self.total_price * Decimal('1.23')
+        return (self.total_price * Decimal('1.23')).quantize(Decimal('0.01'))
 
 
 # --- POZYCJE OFERTY (Tu też mała zmiana pod waluty) ---

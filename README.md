@@ -1,39 +1,41 @@
-# 🚀 System Ofertowania B2B (Django CRM)
+# System Ofertowania B2B (Django + React)
 
-Kompleksowa aplikacja webowa typu CRM przeznaczona do automatyzacji, weryfikacji i generowania ofert handlowych w sektorze B2B. System usprawnia komunikację na linii **Handlowiec ↔ CEO ↔ Dział Techniczny**, eliminuje błędy w kalkulacjach finansowych oraz automatyzuje generowanie ujednoliconych dokumentów PDF.
+Aplikacja webowa do tworzenia i obsługi ofert handlowych B2B z prostym modułem CRM. Projekt powstał, żeby zastąpić ręczne klepanie kosztorysów w Excelu i uporządkować proces akceptacji ofert między handlowcem, działem IT a szefem (CEO).
 
-Projekt został zrealizowany w zwinnej metodyce **SCRUM** (Solo Scrum) w okresie od **25 kwietnia 2026 r. do 19 czerwca 2026 r.**
+Aktualnie projekt jest w trakcie przebudowy do **wersji 2.0** – przeszedłem z klasycznych szablonów HTML w Django na osobne REST API (Django REST Framework + PostgreSQL) oraz frontend w React + TypeScript.
 
----
+## Struktura projektu
 
-## 📋 1. Opis i Założenia Projektu
+Projekt jest podzielony na dwa główne foldery:
+* `offert_system_backend/` – backend w Pythonie (Django, DRF, generowanie PDF, testy w pytest, Docker)
+* `offert_system_frontend/` – frontend w React + TypeScript (Vite)
 
-System rozwiązuje realny problem biznesowy, jakim jest "ręczne" tworzenie ofert w arkuszach kalkulacyjnych (Excel) oraz brak kontroli nad obiegiem zatwierdzeń dokumentów. 
+## Technologie
 
-### Kluczowe Funkcjonalności:
-*   **Zarządzanie bazą CRM**: Baza firm partnerskich, baza osób kontaktowych (klientów), baza własnych spółek handlowych (wystawców wraz z kontami bankowymi i logotypami) oraz profile handlowców (z zapisem numerów telefonów).
-*   **Kreator Kosztorysów**: Dynamiczne dodawanie pozycji oferty (JS) z automatycznym wyliczaniem kwot Netto, VAT (23%) oraz Brutto przy użyciu sygnałów Django na poziomie bazy danych.
-*   **Zwinny Obieg Dokumentów**: Sztywny podział uprawnień i blokada edycji ofert zatwierdzonych lub oczekujących (ACL).
-*   **Feedback Loop**: Obowiązkowy formularz podania powodu odrzucenia oferty przez CEO wraz z natychmiastowym powiadomieniem dla handlowca.
-*   **Automatyczny Generator PDF**: Tworzenie profesjonalnych ofert w formacie PDF jednym kliknięciem za pomocą silnika `WeasyPrint` z obsługą dynamicznego ładowania logotypu.
-*   **Automatyczna Sekwencyjność**: Chronologiczne i automatyczne nadawanie numerów ofert w formacie `nr/miesiąc/rok` bezpośrednio przy zapisie do bazy.
+**Backend:**
+* Python 3.11 / Django 5
+* Django REST Framework + SimpleJWT (logowanie tokenami JWT)
+* drf-spectacular (dokumentacja Swagger pod `/api/docs/`)
+* PostgreSQL 15 (uruchamiany w kontenerze Dockera)
+* WeasyPrint (generowanie gotowych plików PDF z ofertą i logo firmy)
+* pytest + pytest-django (testy jednostkowe i API)
 
----
+**Frontend (w trakcie budowy):**
+* React 19 + TypeScript (Vite)
+* Axios (komunikacja z API + interceptor podpinający token JWT)
 
-## 🛠️ 2. Stos Technologiczny
+## Główne funkcje
 
-*   **Backend**: Python 3.11+, Django 5.x (MVC Architecture)
-*   **Frontend**: HTML5, CSS3, Bootstrap 5 (Responsive Web Design), Vanilla JS
-*   **Baza danych**: SQLite (Dev) / PostgreSQL ready
-*   **Silnik PDF**: WeasyPrint (wymaga bibliotek systemowych Cairo i Pango)
-*   **Edytor tekstu**: CKEditor (Rich Text Field dla opisów SOW)
+* **Baza CRM**: zarządzanie firmami klientów, osobami kontaktowymi oraz danymi własnych spółek (wystawców ofert wraz z logo).
+* **Kalkulacja kwot**: automatyczne przeliczanie wartości netto, podatku VAT (23%) i kwoty brutto na podstawie pozycji kosztorysu (oparte na typie `Decimal` i sygnałach Django).
+* **Numeracja ofert**: automatyczne nadawanie kolejnych numerów w formacie `nr/MM/RRRR` w ramach danego miesiąca.
+* **Obieg statusów (Workflow) i uprawnienia**:
+  * Handlowiec tworzy szkic oferty (`draft`), może go wysłać do konsultacji technicznej IT (`consultation`) albo do akceptacji CEO (`pending`).
+  * Po wysłaniu oferty jej edycja jest blokowana.
+  * CEO (superuser) może zatwierdzić ofertę (`approved`) lub ją odrzucić (`rejected`) z podaniem powodu odrzucenia, po czym handlowiec może cofnąć ją do poprawy.
+* **Eksport do PDF**: generowanie dokumentu PDF z tabelą pozycji, warunkami płatności, logo wystawcy i danymi kontaktowymi handlowca (imię, nazwisko, email, telefon z profilu użytkownika).
 
----
-
-## 📊 3. Architektura Systemu i Bazy Danych
-
-### Diagram Związków Encji (ERD):
-Aplikacja przechowuje dane w bazie relacyjnej. Poniższy schemat przedstawia strukturę relacji po rozszerzeniu bazy o profile użytkowników:
+## Schemat bazy danych
 
 ```mermaid
 erDiagram
@@ -68,7 +70,7 @@ erDiagram
         int client_id FK "Nabywca"
         string offer_number "Numer oferty (Unique)"
         string status "Status (Choice)"
-        text description "Opis (RichText)"
+        text description "Opis zakresu prac"
         decimal total_price "Suma Netto"
         decimal currency_rate "Kurs EUR"
         datetime created_at "Data utworzenia"
@@ -107,110 +109,46 @@ erDiagram
     USER ||--o{ OFFER : "tworzy"
 ```
 
----
+## Jak uruchomić projekt lokalnie
 
-## 🔄 4. Maszyna Stanów (Obieg Dokumentów)
+### 1. Backend (Docker)
 
-Oferta przechodzi przez ściśle zdefiniowane statusy, co gwarantuje pełne bezpieczeństwo danych i przejrzystość procesu:
+Wymagany zainstalowany Docker / OrbStack.
 
-```mermaid
-stateDiagram-v2
-    [*] --> DRAFT : Handlowiec tworzy ofertę (Szkic)
-    DRAFT --> PENDING : Handlowiec klika "Wyślij do akceptacji"
-    DRAFT --> CONSULTATION : Handlowiec klika "Konsultacja z Seniorem IT"
-    CONSULTATION --> DRAFT : Powrót do edycji po uwagach technicznych
-    PENDING --> APPROVED : CEO klika "Zatwierdź"
-    PENDING --> REJECTED : CEO klika "Odrzuć" (Wymaga wpisania uzasadnienia)
-    REJECTED --> DRAFT : Handlowiec klika "Przywróć do edycji" (Widzi powód odrzucenia)
-    APPROVED --> SENT : Handlowiec generuje PDF i wysyła do klienta
-    SENT --> [*]
-    
-    note right of PENDING
-      Blokada edycji (Readonly)
-      dla Handlowca
-    end note
-    note right of APPROVED
-      Zablokowane do edycji.
-      Odblokowany przycisk "Pobierz PDF"
-    end note
-```
-
----
-
-## ⚙️ 5. Instrukcja Instalacji i Uruchomienia
-
-Aby uruchomić projekt lokalnie na swoim komputerze:
-
-### 1. Sklonuj repozytorium:
 ```bash
-git clone <adres_Twojego_repozytorium>
-cd offert_system_basic
+cd offert_system_backend
+cp .env.example .env
 ```
+*(W pliku `.env` ustaw hasło do bazy `POSTGRES_PASSWORD`).*
 
-### 2. Utwórz i aktywuj środowisko wirtualne:
+Uruchomienie kontenerów i migracja bazy:
 ```bash
-python3 -m venv venv
-source venv/bin/activate  # Dla Mac/Linux
-# venv\Scripts\activate   # Dla Windows
+docker compose up -d --build
+docker compose exec web python manage.py migrate
+docker compose exec web python manage.py createsuperuser
 ```
 
-### 3. Zainstaluj zależności:
+Dostępne adresy backendu:
+* API: `http://localhost:8000/api/`
+* Dokumentacja Swagger: `http://localhost:8000/api/docs/`
+* Panel Admina: `http://localhost:8000/admin/`
+
+Uruchomienie testów:
 ```bash
-pip install -r requirements.txt
+docker compose exec web pytest
 ```
 
+### 2. Frontend (React + TS)
 
-### 4. Wykonaj migracje bazy danych:
+W drugim terminalu:
 ```bash
-python manage.py migrate
+cd offert_system_frontend
+npm install
+npm run dev
 ```
+Aplikacja frontendowa uruchomi się pod adresem `http://localhost:5173/`.
 
-### 5. Utwórz konto administratora :
-```bash
-python manage.py createsuperuser
-```
-*(Postępuj zgodnie z komunikatami w terminalu: podaj nazwę użytkownika, email i hasło).*
-
-### 6. Uruchom serwer deweloperski:
-```bash
-python manage.py runserver
-```
-Aplikacja będzie dostępna w przeglądarce pod adresem: [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
-
----
-
-## 👥 6. Instrukcja Użytkownika (User Guide)
-
-### Perspektywa 1: Handlowiec (User standardowy)
-1.  Zaloguj się na swoje konto.
-2.  Przejdź do **Kreatora Ofert** klikając "+ Nowa Oferta".
-3.  Wybierz Wystawcę, Klienta, wpisz opis zakresu prac, określ terminy ważności i płatności.
-4.  W tabeli pozycji wpisz nazwę usługi, ilość i cenę jednostkową netto. Użyj przycisku "Dodaj kolejną pozycję", aby rozszerzyć kosztorys. Kliknij "Zapisz".
-5.  W szczegółach oferty zobaczysz automatycznie wygenerowany numer oferty oraz precyzyjne podsumowanie (Suma Netto, podatek VAT 23% oraz sumę Brutto).
-6.  Kliknij "Wyślij do CEO", aby przekazać dokument do weryfikacji. Oferta zostanie zablokowana do edycji (status `Oczekuje na akceptację`).
-
-### Perspektywa 2: CEO / Manager (Superuser / Administrator)
-1.  Zaloguj się na konto z uprawnieniami administratora.
-2.  Na liście ofert zobaczysz statusy wszystkich dokumentów.
-3.  Przy ofertach ze statusem `Oczekuje na akceptację` pojawią się akcje:
-    *   **Zatwierdź (Zielony przycisk ✔)**: Zmienia status na `Zatwierdzona`. Handlowiec ma teraz możliwość pobrania oficjalnego pliku PDF.
-    *   **Odrzuć (Czerwony przycisk ✘)**: Przekierowuje do formularza odrzucenia. **Musisz podać pisemny powód odrzucenia** (np. "Zbyt niska marża, popraw ceny o 10%"). Handlowiec natychmiast zobaczy to uzasadnienie w czerwonym boksie i będzie mógł poprawić dokument.
-
----
-
-## 📂 7. Metodyka SCRUM (Dokumentacja Akademicka)
-
-Projekt został w 100% zaimplementowany zgodnie ze standardami inżynierii oprogramowania w zwinnej metodyce SCRUM. Pełna dokumentacja projektowa znajduje się w katalogu [docs/scrum/](file:///Users/jakuba/projekty/offert_system_basic/docs/scrum):
-
-*   **[Karta Projektu](file:///Users/jakuba/projekty/offert_system_basic/docs/scrum/00_project_charter.md)**: Założenia biznesowe, analiza wymagań, Definition of Done (DoD).
-*   **[Product Backlog](file:///Users/jakuba/projekty/offert_system_basic/docs/scrum/01_product_backlog.md)**: 11 historyjek użytkownika (User Stories) z kryteriami akceptacji, estymacją w Story Points i priorytetami MoSCoW.
-*   **[Log Sprintu 1 (25.04 – 08.05.2026)](file:///Users/jakuba/projekty/offert_system_basic/docs/scrum/02_sprint_1.md)**: Fundamenty CRM, baza danych, planowanie, dane do wykresu Burndown, retrospektywa.
-*   **[Log Sprintu 2 (09.05 – 22.05.2026)](file:///Users/jakuba/projekty/offert_system_basic/docs/scrum/03_sprint_2.md)**: Kreator kosztorysów, formularze i logika kalkulacji finansowych.
-*   **[Log Sprintu 3 (23.05 – 05.06.2026)](file:///Users/jakuba/projekty/offert_system_basic/docs/scrum/04_sprint_3.md)**: Maszyna stanów, generator PDF, szlify UX i naprawa błędów CSS.
-*   **[Log Sprintu 4 (06.06 – 19.06.2026)](file:///Users/jakuba/projekty/offert_system_basic/docs/scrum/05_sprint_4.md)**: Automatyzacja numeracji, profile handlowców, poprawki ładowania logo i stylistyki PDF.
-*   **[Skrypt symulacji Git](file:///Users/jakuba/projekty/offert_system_basic/docs/scrum/git_simulate.sh)**: Skrypt Bash generujący historyczny rejestr 14 commitów odzwierciedlający naszą pracę w tych sprintach.
-
----
-Autor: **Jakub**
-Okres Akademicki: **Semestr Letni 2026**
-Metodyka Zwinna: **SCRUM / Solo Scrum**
+## Planowane w wersji 2.0 (TODO)
+* Rozbudowa widoków w Reactcie (formularz tworzenia ofert, zmiana statusów, pobieranie PDF z poziomu UI).
+* Integracja z API NBP (automatyczne kursy walut) oraz eksport danych pod KSeF.
+* Moduł AI pomagający wygenerować pozycje kosztorysu na podstawie wiadomości od klienta.
